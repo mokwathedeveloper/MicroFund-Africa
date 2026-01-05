@@ -48,12 +48,22 @@ struct DepositRequest { amount: f64, phone_number: Option<String> }
 #[derive(Serialize)]
 struct RepayRequest { loan_id: Uuid }
 
+#[derive(Deserialize, Serialize, Clone, PartialEq)]
+pub struct PlatformTransaction {
+    pub id: Uuid,
+    pub activity_type: String,
+    pub description: String,
+    pub amount: f64,
+    pub signature: String,
+}
+
 #[function_component(Dashboard)]
 pub fn dashboard() -> Html {
     let context = use_context::<AppContext>().unwrap();
     let loans = use_state(|| get_cache::<Vec<Loan>>("cache_loans").unwrap_or_default());
     let marketplace = use_state(|| Vec::<MarketplaceLoan>::new());
     let savings = use_state(|| get_cache::<Vec<Savings>>("cache_savings").unwrap_or_default());
+    let ledger = use_state(|| Vec::<PlatformTransaction>::new());
     let profile = use_state(|| get_cache::<UserProfile>("cache_profile").unwrap_or(UserProfile { username: "".to_string(), reputation_score: 100 }));
     
     let loan_amount = use_state(|| 0.0);
@@ -65,11 +75,13 @@ pub fn dashboard() -> Html {
         let loans = loans.clone();
         let savings = savings.clone();
         let marketplace = marketplace.clone();
+        let ledger = ledger.clone();
         let profile = profile.clone();
         Callback::from(move |_| {
             let loans = loans.clone();
             let savings = savings.clone();
             let marketplace = marketplace.clone();
+            let ledger = ledger.clone();
             let profile = profile.clone();
             wasm_bindgen_futures::spawn_local(async move {
                 if let Ok(data) = get::<Vec<Loan>>("/loans").await {
@@ -82,6 +94,9 @@ pub fn dashboard() -> Html {
                 }
                 if let Ok(data) = get::<Vec<MarketplaceLoan>>("/loans/marketplace").await {
                     marketplace.set(data);
+                }
+                if let Ok(data) = get::<Vec<PlatformTransaction>>("/ledger").await {
+                    ledger.set(data);
                 }
                 if let Ok(data) = get::<UserProfile>("/auth/profile").await {
                     set_cache("cache_profile", &data);
@@ -169,7 +184,7 @@ pub fn dashboard() -> Html {
                     phone_number: if phone_val.is_empty() { None } else { Some(phone_val) }
                 }).await {
                     Ok(_) => {
-                        context.add_notification.emit(("Deposit initiated! Check your phone for STK push.", NotificationType::Info));
+                        context.add_notification.emit(("Deposit initiated! Check your phone for STK push.".to_string(), NotificationType::Info));
                         fetch_data.emit(());
                     }
                     Err(e) => context.add_notification.emit((format!("Error: {}", e), NotificationType::Error)),
@@ -187,7 +202,7 @@ pub fn dashboard() -> Html {
             wasm_bindgen_futures::spawn_local(async move {
                 match post::<_, String>("/loans/repay", &RepayRequest { loan_id: id }).await {
                     Ok(_) => {
-                        context.add_notification.emit(("Loan repaid successfully! Your Trust Score increased.", NotificationType::Success));
+                        context.add_notification.emit(("Loan repaid successfully! Your Trust Score increased.".to_string(), NotificationType::Success));
                         fetch_data.emit(());
                     }
                     Err(e) => context.add_notification.emit((format!("Error: {}", e), NotificationType::Error)),
@@ -205,7 +220,7 @@ pub fn dashboard() -> Html {
             wasm_bindgen_futures::spawn_local(async move {
                 match post::<_, String>(&format!("/loans/{}/fund", id), &()).await {
                     Ok(_) => {
-                        context.add_notification.emit(("You funded a neighbor's loan! Impact increased.", NotificationType::Success));
+                        context.add_notification.emit(("You funded a neighbor's loan! Impact increased.".to_string(), NotificationType::Success));
                         fetch_data.emit(());
                     }
                     Err(e) => context.add_notification.emit((format!("Error: {}", e), NotificationType::Error)),
@@ -266,7 +281,23 @@ pub fn dashboard() -> Html {
                 </div>
             </div>
 
-            <div class="dashboard-grid" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));">
+                <section class="section-card">
+                    <h3>{ "Live Network Activity" }</h3>
+                    <p style="font-size: 0.8rem; color: #7f8c8d; margin-bottom: 1rem;">{ "Real-time on-chain platform events." }</p>
+                    <div class="ledger-list" style="max-height: 400px; overflow-y: auto;">
+                        { for ledger.iter().map(|tx| html! {
+                            <div style="font-size: 0.7rem; padding: 0.5rem; border-bottom: 1px solid #eee; font-family: monospace;">
+                                <div style="display: flex; justify-content: space-between; font-weight: bold;">
+                                    <span>{ &tx.activity_type }</span>
+                                    <span style="color: #2ecc71;">{ format!("+${:.2}", tx.amount) }</span>
+                                </div>
+                                <div style="color: #7f8c8d; margin: 2px 0;">{ &tx.description }</div>
+                                <div style="color: #3498db; overflow: hidden; text-overflow: ellipsis;">{ format!("Sig: {}", tx.signature) }</div>
+                            </div>
+                        })}
+                    </div>
+                </section>
+
                 <section class="section-card">
                     <h3>{ t("marketplace", &context.lang) }</h3>
                     <p style="font-size: 0.9rem; color: #7f8c8d;">{ "Fund a loan to help a neighbor and earn reputation." }</p>
