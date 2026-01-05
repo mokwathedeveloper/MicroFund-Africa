@@ -1,4 +1,4 @@
-use actix_web::{web, HttpResponse, Responder};
+use actix_web::{web, HttpResponse};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use argon2::{
@@ -9,6 +9,7 @@ use jsonwebtoken::{encode, Header, EncodingKey};
 use chrono::{Utc, Duration};
 use uuid::Uuid;
 use crate::models::User;
+use crate::middleware::AppError;
 
 #[derive(Deserialize)]
 pub struct RegisterRequest {
@@ -26,12 +27,12 @@ pub struct AuthResponse {
 pub async fn register(
     pool: web::Data<PgPool>,
     form: web::Json<RegisterRequest>,
-) -> impl Responder {
+) -> Result<HttpResponse, AppError> {
     let salt = SaltString::generate(&mut OsRng);
     let argon2 = Argon2::default();
     let password_hash = argon2
         .hash_password(form.password.as_bytes(), &salt)
-        .expect("Failed to hash password")
+        .map_err(|_| AppError::InternalServerError)?
         .to_string();
 
     let user_id = Uuid::new_v4();
@@ -49,14 +50,17 @@ pub async fn register(
     match result {
         Ok(record) => {
             let token = generate_token(record.id);
-            HttpResponse::Ok().json(AuthResponse {
+            Ok(HttpResponse::Ok().json(AuthResponse {
                 token,
                 user_id: record.id,
-            })
+            }))
         }
         Err(e) => {
             log::error!("Failed to register user: {:?}", e);
-            HttpResponse::InternalServerError().body("Failed to register user")
+            if e.to_string().contains("unique constraint") {
+                return Err(AppError::Conflict("Username or email already exists".to_string()));
+            }
+            Err(AppError::InternalServerError)
         }
     }
 }
@@ -70,7 +74,7 @@ pub struct LoginRequest {
 pub async fn login(
     pool: web::Data<PgPool>,
     form: web::Json<LoginRequest>,
-) -> impl Responder {
+) -> Result<HttpResponse, AppError> {
     let result = sqlx::query_as!(
         User,
         "SELECT * FROM users WHERE username = $1",
@@ -81,21 +85,21 @@ pub async fn login(
 
     match result {
         Ok(Some(user)) => {
-            let parsed_hash = PasswordHash::new(&user.password_hash).expect("Invalid password hash in DB");
+            let parsed_hash = PasswordHash::new(&user.password_hash).map_err(|_| AppError::InternalServerError)?;
             if Argon2::default().verify_password(form.password.as_bytes(), &parsed_hash).is_ok() {
                 let token = generate_token(user.id);
-                HttpResponse::Ok().json(AuthResponse {
+                Ok(HttpResponse::Ok().json(AuthResponse {
                     token,
                     user_id: user.id,
-                })
+                }))
             } else {
-                HttpResponse::Unauthorized().body("Invalid credentials")
+                Err(AppError::Unauthorized)
             }
         }
-        Ok(None) => HttpResponse::Unauthorized().body("Invalid credentials"),
+        Ok(None) => Err(AppError::Unauthorized),
         Err(e) => {
             log::error!("Database error: {:?}", e);
-            HttpResponse::InternalServerError().body("Internal server error")
+            Err(AppError::InternalServerError)
         }
     }
 }
