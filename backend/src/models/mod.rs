@@ -15,6 +15,7 @@ pub struct User {
 pub struct Loan {
     pub id: Uuid,
     pub user_id: Uuid,
+    pub lender_id: Option<Uuid>,
     pub amount: f64,
     pub status: String,
     pub description: Option<String>,

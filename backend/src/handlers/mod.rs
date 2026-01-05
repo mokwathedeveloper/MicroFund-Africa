@@ -14,6 +14,8 @@ pub fn config(cfg: &mut web::ServiceConfig) {
         web::scope("/loans")
             .route("", web::post().to(loans::create_loan))
             .route("", web::get().to(loans::get_loans))
+            .route("/marketplace", web::get().to(loans::get_marketplace))
+            .route("/{id}/fund", web::post().to(loans::fund_loan))
             .route("/repay", web::post().to(loans::repay_loan))
     )
     .service(
