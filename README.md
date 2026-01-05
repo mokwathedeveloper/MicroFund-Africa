@@ -60,66 +60,46 @@ For the easiest setup, use Docker Compose to spin up the entire stack including 
 3. `anchor deploy`
 
 ## Implementation Status
-- [x] User registration & Login (Argon2 + JWT)
-- [x] **Reputation System**: "Trust Score" that increases with every successful repayment.
-- [x] Microloan submission (Backend + Frontend)
-- [x] **P2P Marketplace**: Peer-to-peer lending where users fund each other's loans.
-- [x] **Savings Platform**: Create goals and deposit funds.
-- [x] **Offline-First**: LocalStorage caching for loans and savings.
-- [x] **Dashboard Analytics**: Real-time summary of borrowing and savings.
-- [x] Loan repayment workflow
-- [x] Solana Smart Contract for Loan logging
-- [x] Responsive CSS styling
 
-## Demo Instructions
-1. Register a new user on the `/register` page.
-2. Login to access the Dashboard.
-3. **Savings**: Create a goal like "Emergency Fund" and deposit some money.
-4. **Loans**: Submit a loan request (e.g., $50 for "Farm Seeds").
-5. **Analytics**: Observe the summary bar updating in real-time.
-6. **Offline**: Refresh the page without an internet connection (if running locally) to see cached data.
+- [x] **Reputation-Based Credit Laddering**: (Innovation) Dynamic loan limits and Reputation Tiers (Bronze, Silver, Gold).
 
-*Note: Smart contract interactions are simulated in the backend via the `BlockchainService`. In a live production environment, this module would be replaced with the `solana-client` crate to communicate with the Solana RPC.*
+- [x] **Multi-Platform Support**: (Usability) Swahili i18n and professional Dark Mode.
+
+- [x] **Secure Identity**: (Technical) Argon2 hashing, JWT sessions, and strict DTO validation.
+
+- [x] **P2P Marketplace**: Peer-to-peer lending ecosystem.
+
+- [x] **Mobile Money Integration**: Simulated M-Pesa STK Push.
+
+- [x] **High-Performance WASM**: Yew frontend with offline-first caching.
+
+- [x] **Observability**: Industrial-grade logging with `tracing`.
 
 
 
 ## Technical Highlights
 
-
-
 - **Memory Safety**: Leverages Rust's ownership model across the entire stack.
-
-
 
 - **Async Power**: High-concurrency handling using `tokio` and `actix-web`.
 
-
-
 - **WASM Performance**: The Yew frontend compiles to highly efficient WebAssembly.
-
-
 
 - **Custom Error Handling**: Robust error propagation using `thiserror` and `AppError` middleware.
 
+- [x] **Strict Validation**: Type-safe input validation using the `validator` crate.
 
+- [x] **CI/CD Quality**: Automated `clippy`, `rustfmt`, and build tests via GitHub Actions.
 
 - **Blockchain Simulation**: Automated logging of loan lifecycle events to a simulated ledger.
-
-
 
 - **Payment Integration**: Simulated M-Pesa STK Push for seamless deposits and repayments.
 
 
 
-
-
-
-
 ## AI Transparency
 
-
-
-This project was developed with the assistance of a Large Language Model (LLM) to ensure rapid prototyping, memory-safe Rust implementation, and comprehensive documentation for the Rust Africa Hackathon 2026.
+This project was developed with the assistance of a Large Language Model (LLM) to ensure rapid prototyping, memory-safe Rust implementation, and comprehensive documentation for the Rust Africa Hackathon 2026. All core business logic and architectural choices were guided by the user to address specific African financial challenges.
 
 
 

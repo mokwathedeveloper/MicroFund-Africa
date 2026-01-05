@@ -24,6 +24,13 @@ jobs:
       uses: dtolnay/rust-toolchain@stable
       with:
         targets: wasm32-unknown-unknown
+        components: clippy, rustfmt
+
+    - name: Rustfmt Check
+      run: cargo fmt --all -- --check
+
+    - name: Clippy Check
+      run: cargo clippy -- -D warnings
 
     - name: Cache Cargo
       uses: actions/cache@v3

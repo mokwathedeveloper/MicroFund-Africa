@@ -3,7 +3,7 @@ use yew_router::prelude::*;
 use crate::Route;
 use crate::services::storage::{get_token, remove_token};
 
-use crate::app_context::AppContext;
+use crate::app_context::{AppContext, Theme};
 use crate::utils::i18n::{Language, t};
 
 #[function_component(Navbar)]
@@ -31,13 +31,27 @@ pub fn navbar() -> Html {
         })
     };
 
+    let toggle_theme = {
+        let context = context.clone();
+        Callback::from(move |_| {
+            let new_theme = match context.theme {
+                Theme::Light => Theme::Dark,
+                Theme::Dark => Theme::Light,
+            };
+            context.set_theme.emit(new_theme);
+        })
+    };
+
     html! {
-        <nav style="background: #34495e; padding: 1rem; color: white; display: flex; justify-content: space-between; align-items: center;">
+        <nav style="padding: 1rem; color: white; display: flex; justify-content: space-between; align-items: center;">
             <div style="font-weight: bold; font-size: 1.2rem; display: flex; align-items: center; gap: 10px;">
                 <div style="width: 24px; height: 24px; background: #2ecc71; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem;">{ "M" }</div>
                 <Link<Route> to={Route::Home} style="color: white; text-decoration: none;">{ "MicroFund Africa" }</Link<Route>>
             </div>
             <div style="display: flex; align-items: center; gap: 1rem;">
+                <button onclick={toggle_theme} style="background: none; border: 1px solid #7f8c8d; color: #bdc3c7; padding: 0.2rem 0.5rem; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">
+                    { if let Theme::Light = context.theme { "Dark" } else { "Light" } }
+                </button>
                 <button onclick={toggle_lang} style="background: none; border: 1px solid #7f8c8d; color: #bdc3c7; padding: 0.2rem 0.5rem; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">
                     { if let Language::English = context.lang { "Swahili" } else { "English" } }
                 </button>

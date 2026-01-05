@@ -11,10 +11,15 @@ use uuid::Uuid;
 use crate::models::User;
 use crate::middleware::AppError;
 
-#[derive(Deserialize)]
+use validator::Validate;
+
+#[derive(Deserialize, Validate)]
 pub struct RegisterRequest {
+    #[validate(length(min = 3, message = "Username must be at least 3 characters"))]
     pub username: String,
+    #[validate(email(message = "Invalid email format"))]
     pub email: String,
+    #[validate(length(min = 6, message = "Password must be at least 6 characters"))]
     pub password: String,
 }
 
@@ -28,6 +33,9 @@ pub async fn register(
     pool: web::Data<SqlitePool>,
     form: web::Json<RegisterRequest>,
 ) -> Result<HttpResponse, AppError> {
+    form.validate().map_err(|e| AppError::BadRequest(e.to_string()))?;
+    
+    tracing::info!("Registering user: {}", form.username);
     let salt = SaltString::generate(&mut OsRng);
     let argon2 = Argon2::default();
     let password_hash = argon2

@@ -224,20 +224,34 @@ pub fn dashboard() -> Html {
     let borrow_width = if max_val > 0.0 { (total_borrowed / max_val) * chart_width as f64 } else { 0.0 };
     let savings_width = if max_val > 0.0 { (total_saved / max_val) * chart_width as f64 } else { 0.0 };
 
+    let (tier, tier_color, next_tier_score) = if profile.reputation_score < 200 {
+        ("BRONZE", "#cd7f32", 200)
+    } else if profile.reputation_score < 500 {
+        ("SILVER", "#c0c0c0", 500)
+    } else {
+        ("GOLD", "#ffd700", 1000)
+    };
+
+    let loan_limit = (profile.reputation_score as f64) * 2.0;
+
     html! {
         <div class="dashboard-container" style="padding: 0 1rem;">
             <div class="summary-bar">
                 <div class="summary-item">
                     <h4>{ "Welcome" }</h4>
                     <p>{ format!("@{}", profile.username) }</p>
+                    <span style={format!("font-size: 0.7rem; color: {}; font-weight: bold; border: 1px solid {}; padding: 2px 5px; border-radius: 4px;", tier_color, tier_color)}>
+                        { tier }
+                    </span>
                 </div>
                 <div class="summary-item">
                     <h4>{ t("trust_score", &context.lang) }</h4>
                     <p style="color: #2ecc71;">{ profile.reputation_score }</p>
+                    <p style="font-size: 0.6rem; color: #7f8c8d;">{ format!("Next Tier: {}/{}", profile.reputation_score, next_tier_score) }</p>
                 </div>
                 <div class="summary-item">
-                    <h4>{ t("total_impact", &context.lang) }</h4>
-                    <p>{ format!("${:.2}", total_borrowed + total_saved) }</p>
+                    <h4>{ "Max Loan Limit" }</h4>
+                    <p style="color: #3498db;">{ format!("${:.2}", loan_limit) }</p>
                 </div>
                 <div class="summary-item">
                     <h4>{ "Balance View" }</h4>

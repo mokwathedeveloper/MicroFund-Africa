@@ -1,15 +1,19 @@
 use actix_web::{web, HttpResponse, HttpRequest};
 use serde::{Deserialize, Serialize};
-use sqlx::SqlitePool;
+use sqlx::PgPool;
 use uuid::Uuid;
 use jsonwebtoken::{decode, DecodingKey, Validation, Algorithm};
+use chrono::{DateTime, Utc};
 use crate::models::Loan;
 use crate::middleware::AppError;
 use crate::services::blockchain::BlockchainService;
+use validator::Validate;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Validate)]
 pub struct CreateLoanRequest {
+    #[validate(range(min = 1.0, max = 5000.0, message = "Loan amount must be between $1 and $5000"))]
     pub amount: f64,
+    #[validate(length(min = 3, message = "Please provide a valid reason"))]
     pub description: Option<String>,
 }
 
@@ -48,7 +52,7 @@ pub async fn get_marketplace(
     match result {
         Ok(loans) => Ok(HttpResponse::Ok().json(loans)),
         Err(e) => {
-            log::error!("Failed to fetch marketplace: {:?}", e);
+            tracing::error!("Failed to fetch marketplace: {:?}", e);
             Err(AppError::InternalServerError)
         }
     }
@@ -76,20 +80,37 @@ pub async fn fund_loan(
         },
         Ok(None) => Err(AppError::BadRequest("Loan not available for funding".to_string())),
         Err(e) => {
-            log::error!("Failed to fund loan: {:?}", e);
+            tracing::error!("Failed to fund loan: {:?}", e);
             Err(AppError::InternalServerError)
         }
     }
 }
 
 pub async fn create_loan(
-    pool: web::Data<SqlitePool>,
+    pool: web::Data<PgPool>,
     req: HttpRequest,
     form: web::Json<CreateLoanRequest>,
 ) -> Result<HttpResponse, AppError> {
+    form.validate().map_err(|e| AppError::BadRequest(e.to_string()))?;
     let user_id = get_user_id_from_req(&req)?;
 
-    // Log the transaction intent to the blockchain simulation
+    // INNOVATION: Reputation-based Dynamic Limits
+    let user = sqlx::query!("SELECT reputation_score FROM users WHERE id = $1", user_id)
+        .fetch_one(pool.get_ref())
+        .await
+        .map_err(|_| AppError::InternalServerError)?;
+
+    let max_limit = (user.reputation_score.unwrap_or(100) as f64) * 2.0;
+    
+    if form.amount > max_limit {
+        return Err(AppError::BadRequest(format!(
+            "Your Trust Score restricts loans to ${:.2}. Repay more loans to increase your limit!", 
+            max_limit
+        )));
+    }
+
+    tracing::info!("User {} creating loan of ${}", user_id, form.amount);
+
     let _ = BlockchainService::log_loan_initialization(
         Uuid::new_v4(), 
         form.amount, 
@@ -109,14 +130,14 @@ pub async fn create_loan(
     match result {
         Ok(record) => Ok(HttpResponse::Ok().json(record.id)),
         Err(e) => {
-            log::error!("Failed to create loan: {:?}", e);
+            tracing::error!("Failed to create loan: {:?}", e);
             Err(AppError::InternalServerError)
         }
     }
 }
 
 pub async fn repay_loan(
-    pool: web::Data<SqlitePool>,
+    pool: web::Data<PgPool>,
     req: HttpRequest,
     form: web::Json<RepayLoanRequest>,
 ) -> Result<HttpResponse, AppError> {
@@ -132,12 +153,11 @@ pub async fn repay_loan(
 
     match result {
         Ok(Some(record)) => {
-            // Log repayment to blockchain
-            let _ = BlockchainService::log_loan_repayment(record.id, "SIMULATED_SIG")
+            BlockchainService::log_loan_repayment(record.id, "SIMULATED_SIG")
                 .await
                 .map_err(|_| AppError::InternalServerError)?;
 
-            // Increase user reputation score on successful repayment
+            // Increase user reputation score
             let _ = sqlx::query!(
                 "UPDATE users SET reputation_score = reputation_score + 10 WHERE id = $1",
                 user_id
@@ -149,7 +169,7 @@ pub async fn repay_loan(
         },
         Ok(None) => Err(AppError::NotFound),
         Err(e) => {
-            log::error!("Failed to repay loan: {:?}", e);
+            tracing::error!("Failed to repay loan: {:?}", e);
             Err(AppError::InternalServerError)
         }
     }
@@ -172,7 +192,7 @@ pub async fn get_loans(
     match result {
         Ok(loans) => Ok(HttpResponse::Ok().json(loans)),
         Err(e) => {
-            log::error!("Failed to fetch loans: {:?}", e);
+            tracing::error!("Failed to fetch loans: {:?}", e);
             Err(AppError::InternalServerError)
         }
     }
@@ -184,7 +204,7 @@ struct Claims {
     exp: usize,
 }
 
-fn get_user_id_from_req(req: &HttpRequest) -> Result<Uuid, AppError> {
+pub fn get_user_id_from_req(req: &HttpRequest) -> Result<Uuid, AppError> {
     let auth_header = req.headers().get("Authorization");
     if let Some(auth_str) = auth_header.and_then(|h| h.to_str().ok()) {
         if auth_str.starts_with("Bearer ") {
