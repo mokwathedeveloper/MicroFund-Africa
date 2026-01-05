@@ -34,7 +34,13 @@ graph TD
 - PostgreSQL
 - Solana CLI & Anchor
 
-### Running the Backend
+### Running with Docker (Recommended for Demo)
+For the easiest setup, use Docker Compose to spin up the entire stack including the database:
+1. `docker-compose up --build`
+2. Access the frontend at `http://localhost:8081`
+3. Access the backend API at `http://localhost:8080/api`
+
+### Running the Backend Locally
 1. `cd backend`
 2. Create a `.env` file:
    ```env
