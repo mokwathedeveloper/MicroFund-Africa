@@ -68,4 +68,18 @@ graph TD
 4. View the pending loan in your dashboard.
 5. Click "Repay" to simulate loan settlement.
 
-*Note: Smart contract interactions are simulated in the backend logs for this demo version to avoid wallet dependency issues during initial setup.*
+*Note: Smart contract interactions are simulated in the backend via the `BlockchainService`. In a live production environment, this module would be replaced with the `solana-client` crate to communicate with the Solana RPC.*
+
+
+
+## Technical Highlights
+
+- **Memory Safety**: Leverages Rust's ownership model across the entire stack.
+
+- **Async Power**: High-concurrency handling using `tokio` and `actix-web`.
+
+- **WASM Performance**: The Yew frontend compiles to highly efficient WebAssembly.
+
+- **Custom Error Handling**: Robust error propagation using `thiserror` and `AppError` middleware.
+
+- **Blockchain Simulation**: Automated logging of loan lifecycle events to a simulated ledger.
