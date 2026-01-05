@@ -11,6 +11,11 @@ pub struct CreateLoanRequest {
     pub description: Option<String>,
 }
 
+#[derive(Deserialize)]
+pub struct RepayLoanRequest {
+    pub loan_id: Uuid,
+}
+
 pub async fn create_loan(
     pool: web::Data<PgPool>,
     req: HttpRequest,
@@ -21,11 +26,16 @@ pub async fn create_loan(
         Err(res) => return res,
     };
 
+    // In a real hackathon demo, we would also trigger a Solana transaction here
+    // for transparency. For now, we log the intent.
+    log::info!("User {} requesting loan of {}", user_id, form.amount);
+
     let result = sqlx::query!(
-        "INSERT INTO loans (user_id, amount, description) VALUES ($1, $2, $3) RETURNING id",
+        "INSERT INTO loans (user_id, amount, description, status) VALUES ($1, $2, $3, $4) RETURNING id",
         user_id,
-        form.amount as f32, // sqlx might prefer f32 or Decimal
-        form.description
+        form.amount as f32,
+        form.description,
+        "pending"
     )
     .fetch_one(pool.get_ref())
     .await;
@@ -35,6 +45,34 @@ pub async fn create_loan(
         Err(e) => {
             log::error!("Failed to create loan: {:?}", e);
             HttpResponse::InternalServerError().body("Failed to create loan")
+        }
+    }
+}
+
+pub async fn repay_loan(
+    pool: web::Data<PgPool>,
+    req: HttpRequest,
+    form: web::Json<RepayLoanRequest>,
+) -> impl Responder {
+    let user_id = match get_user_id_from_req(&req) {
+        Ok(id) => id,
+        Err(res) => return res,
+    };
+
+    let result = sqlx::query!(
+        "UPDATE loans SET status = 'repaid', repaid_at = NOW() WHERE id = $1 AND user_id = $2 RETURNING id",
+        form.loan_id,
+        user_id
+    )
+    .fetch_optional(pool.get_ref())
+    .await;
+
+    match result {
+        Ok(Some(_)) => HttpResponse::Ok().body("Loan repaid successfully"),
+        Ok(None) => HttpResponse::NotFound().body("Loan not found or unauthorized"),
+        Err(e) => {
+            log::error!("Failed to repay loan: {:?}", e);
+            HttpResponse::InternalServerError().body("Failed to repay loan")
         }
     }
 }
@@ -50,7 +88,7 @@ pub async fn get_loans(
 
     let result = sqlx::query_as!(
         Loan,
-        "SELECT id, user_id, amount::float8 as amount, status, description, created_at, repaid_at FROM loans WHERE user_id = $1",
+        "SELECT id, user_id, amount::float8 as amount, status, description, created_at, repaid_at FROM loans WHERE user_id = $1 ORDER BY created_at DESC",
         user_id
     )
     .fetch_all(pool.get_ref())
