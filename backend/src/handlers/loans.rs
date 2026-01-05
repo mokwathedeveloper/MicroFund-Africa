@@ -136,6 +136,14 @@ pub async fn repay_loan(
             let _ = BlockchainService::log_loan_repayment(record.id, "SIMULATED_SIG")
                 .await
                 .map_err(|_| AppError::InternalServerError)?;
+
+            // Increase user reputation score on successful repayment
+            let _ = sqlx::query!(
+                "UPDATE users SET reputation_score = reputation_score + 10 WHERE id = $1",
+                user_id
+            )
+            .execute(pool.get_ref())
+            .await;
                 
             Ok(HttpResponse::Ok().body("Loan repaid successfully"))
         },

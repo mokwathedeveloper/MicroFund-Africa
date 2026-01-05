@@ -1,6 +1,6 @@
 use actix_web::{web, HttpResponse};
 use serde::{Deserialize, Serialize};
-use sqlx::PgPool;
+use sqlx::SqlitePool;
 use argon2::{
     password_hash::{rand_core::OsRng, PasswordHasher, PasswordVerifier, SaltString},
     Argon2, PasswordHash,
@@ -25,7 +25,7 @@ pub struct AuthResponse {
 }
 
 pub async fn register(
-    pool: web::Data<PgPool>,
+    pool: web::Data<SqlitePool>,
     form: web::Json<RegisterRequest>,
 ) -> Result<HttpResponse, AppError> {
     let salt = SaltString::generate(&mut OsRng);
@@ -102,6 +102,36 @@ pub async fn login(
             Err(AppError::InternalServerError)
         }
     }
+}
+
+pub async fn get_profile(
+    pool: web::Data<PgPool>,
+    req: HttpRequest,
+) -> Result<HttpResponse, AppError> {
+    use crate::handlers::loans::get_user_id_from_req;
+    let user_id = get_user_id_from_req(&req)?;
+
+    let user = sqlx::query_as!(
+        User,
+        "SELECT * FROM users WHERE id = $1",
+        user_id
+    )
+    .fetch_one(pool.get_ref())
+    .await
+    .map_err(|_| AppError::NotFound)?;
+
+    #[derive(Serialize)]
+    struct ProfileResponse {
+        username: String,
+        email: String,
+        reputation_score: i32,
+    }
+
+    Ok(HttpResponse::Ok().json(ProfileResponse {
+        username: user.username,
+        email: user.email,
+        reputation_score: user.reputation_score,
+    }))
 }
 
 #[derive(Debug, Serialize, Deserialize)]

@@ -9,6 +9,7 @@ pub fn config(cfg: &mut web::ServiceConfig) {
         web::scope("/auth")
             .route("/register", web::post().to(auth::register))
             .route("/login", web::post().to(auth::login))
+            .route("/profile", web::get().to(auth::get_profile))
     )
     .service(
         web::scope("/loans")

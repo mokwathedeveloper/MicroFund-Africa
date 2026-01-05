@@ -8,6 +8,7 @@ pub struct User {
     pub username: String,
     pub email: String,
     pub password_hash: String,
+    pub reputation_score: i32,
     pub created_at: Option<DateTime<Utc>>,
 }
 
