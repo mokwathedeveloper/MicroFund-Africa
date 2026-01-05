@@ -36,11 +36,14 @@ fn switch(routes: Route) -> Html {
     }
 }
 
+use components::navbar::Navbar;
+
 #[function_component(App)]
 fn app() -> Html {
     html! {
         <BrowserRouter>
-            <main>
+            <Navbar />
+            <main style="padding-top: 2rem;">
                 <Switch<Route> render={switch} />
             </main>
         </BrowserRouter>
