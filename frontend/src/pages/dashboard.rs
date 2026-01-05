@@ -31,9 +31,18 @@ struct DepositRequest { amount: f64 }
 #[derive(Serialize)]
 struct RepayRequest { loan_id: Uuid }
 
+#[derive(Deserialize, Serialize, Clone, PartialEq)]
+pub struct MarketplaceLoan {
+    pub id: Uuid,
+    pub borrower_username: String,
+    pub amount: f64,
+    pub description: Option<String>,
+}
+
 #[function_component(Dashboard)]
 pub fn dashboard() -> Html {
     let loans = use_state(|| get_cache::<Vec<Loan>>("cache_loans").unwrap_or_default());
+    let marketplace = use_state(|| Vec::<MarketplaceLoan>::new());
     let savings = use_state(|| get_cache::<Vec<Savings>>("cache_savings").unwrap_or_default());
     
     let loan_amount = use_state(|| 0.0);
@@ -43,9 +52,11 @@ pub fn dashboard() -> Html {
     let fetch_data = {
         let loans = loans.clone();
         let savings = savings.clone();
+        let marketplace = marketplace.clone();
         Callback::from(move |_| {
             let loans = loans.clone();
             let savings = savings.clone();
+            let marketplace = marketplace.clone();
             wasm_bindgen_futures::spawn_local(async move {
                 if let Ok(data) = get::<Vec<Loan>>("/loans").await {
                     set_cache("cache_loans", &data);
@@ -54,6 +65,9 @@ pub fn dashboard() -> Html {
                 if let Ok(data) = get::<Vec<Savings>>("/savings").await {
                     set_cache("cache_savings", &data);
                     savings.set(data);
+                }
+                if let Ok(data) = get::<Vec<MarketplaceLoan>>("/loans/marketplace").await {
+                    marketplace.set(data);
                 }
             });
         })
@@ -119,6 +133,17 @@ pub fn dashboard() -> Html {
         })
     };
 
+    let fund_loan = |id: Uuid| {
+        let fetch_data = fetch_data.clone();
+        Callback::from(move |_| {
+            let fetch_data = fetch_data.clone();
+            wasm_bindgen_futures::spawn_local(async move {
+                let _: Result<String, String> = post(&format!("/loans/{}/fund", id), &()).await;
+                fetch_data.emit(());
+            });
+        })
+    };
+
     let total_borrowed: f64 = loans.iter().map(|l| l.amount).sum();
     let total_saved: f64 = savings.iter().map(|s| s.amount).sum();
 
@@ -126,20 +151,37 @@ pub fn dashboard() -> Html {
         <div class="dashboard-container" style="padding: 0 1rem;">
             <div class="summary-bar">
                 <div class="summary-item">
-                    <h4>{ "Total Borrowed" }</h4>
-                    <p>{ format!("${:.2}", total_borrowed) }</p>
+                    <h4>{ "Total Impact" }</h4>
+                    <p>{ format!("${:.2}", total_borrowed + total_saved) }</p>
                 </div>
                 <div class="summary-item">
                     <h4>{ "Total Saved" }</h4>
                     <p>{ format!("${:.2}", total_saved) }</p>
                 </div>
                 <div class="summary-item">
-                    <h4>{ "Active Goals" }</h4>
-                    <p>{ savings.len() }</p>
+                    <h4>{ "Marketplace" }</h4>
+                    <p>{ marketplace.len() }</p>
                 </div>
             </div>
 
-            <div class="dashboard-grid">
+            <div class="dashboard-grid" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));">
+                <section class="section-card">
+                    <h3>{ "P2P Marketplace" }</h3>
+                    <p style="font-size: 0.9rem; color: #7f8c8d;">{ "Fund a loan to help a neighbor and earn reputation." }</p>
+                    <div class="marketplace-list">
+                        { for marketplace.iter().map(|m| html! {
+                            <div class="stat-card" style="text-align: left; display: flex; justify-content: space-between; align-items: center; border-left-color: #3498db;">
+                                <div>
+                                    <p style="margin: 0; font-weight: bold;">{ format!("${:.2}", m.amount) }</p>
+                                    <p style="margin: 0.2rem 0; font-size: 0.8rem;">{ format!("By: @{}", m.borrower_username) }</p>
+                                    <p style="margin: 0; font-size: 0.8rem; color: #7f8c8d;">{ m.description.clone().unwrap_or_default() }</p>
+                                </div>
+                                <button onclick={fund_loan(m.id)} class="btn" style="width: auto; font-size: 0.8rem; background: #3498db;">{ "Fund" }</button>
+                            </div>
+                        })}
+                    </div>
+                </section>
+
                 <section class="section-card">
                     <h3>{ "Microloans" }</h3>
                     <form onsubmit={on_loan_submit} style="margin-bottom: 1.5rem;">
