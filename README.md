@@ -56,17 +56,20 @@ graph TD
 ## Implementation Status
 - [x] User registration & Login (Argon2 + JWT)
 - [x] Microloan submission (Backend + Frontend)
+- [x] **Savings Platform**: Create goals and deposit funds.
+- [x] **Offline-First**: LocalStorage caching for loans and savings.
+- [x] **Dashboard Analytics**: Real-time summary of borrowing and savings.
 - [x] Loan repayment workflow
-- [x] Dashboard with real-time API data
 - [x] Solana Smart Contract for Loan logging
 - [x] Responsive CSS styling
 
 ## Demo Instructions
 1. Register a new user on the `/register` page.
 2. Login to access the Dashboard.
-3. Submit a loan request (e.g., $50 for "Farm Seeds").
-4. View the pending loan in your dashboard.
-5. Click "Repay" to simulate loan settlement.
+3. **Savings**: Create a goal like "Emergency Fund" and deposit some money.
+4. **Loans**: Submit a loan request (e.g., $50 for "Farm Seeds").
+5. **Analytics**: Observe the summary bar updating in real-time.
+6. **Offline**: Refresh the page without an internet connection (if running locally) to see cached data.
 
 *Note: Smart contract interactions are simulated in the backend via the `BlockchainService`. In a live production environment, this module would be replaced with the `solana-client` crate to communicate with the Solana RPC.*
 
