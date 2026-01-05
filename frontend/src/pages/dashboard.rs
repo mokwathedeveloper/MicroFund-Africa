@@ -39,11 +39,18 @@ pub struct MarketplaceLoan {
     pub description: Option<String>,
 }
 
+#[derive(Deserialize, Serialize, Clone, PartialEq)]
+pub struct UserProfile {
+    pub username: String,
+    pub reputation_score: i32,
+}
+
 #[function_component(Dashboard)]
 pub fn dashboard() -> Html {
     let loans = use_state(|| get_cache::<Vec<Loan>>("cache_loans").unwrap_or_default());
     let marketplace = use_state(|| Vec::<MarketplaceLoan>::new());
     let savings = use_state(|| get_cache::<Vec<Savings>>("cache_savings").unwrap_or_default());
+    let profile = use_state(|| get_cache::<UserProfile>("cache_profile").unwrap_or(UserProfile { username: "".to_string(), reputation_score: 100 }));
     
     let loan_amount = use_state(|| 0.0);
     let loan_desc = use_state(|| "".to_string());
@@ -53,10 +60,12 @@ pub fn dashboard() -> Html {
         let loans = loans.clone();
         let savings = savings.clone();
         let marketplace = marketplace.clone();
+        let profile = profile.clone();
         Callback::from(move |_| {
             let loans = loans.clone();
             let savings = savings.clone();
             let marketplace = marketplace.clone();
+            let profile = profile.clone();
             wasm_bindgen_futures::spawn_local(async move {
                 if let Ok(data) = get::<Vec<Loan>>("/loans").await {
                     set_cache("cache_loans", &data);
@@ -68,6 +77,10 @@ pub fn dashboard() -> Html {
                 }
                 if let Ok(data) = get::<Vec<MarketplaceLoan>>("/loans/marketplace").await {
                     marketplace.set(data);
+                }
+                if let Ok(data) = get::<UserProfile>("/auth/profile").await {
+                    set_cache("cache_profile", &data);
+                    profile.set(data);
                 }
             });
         })
@@ -151,12 +164,16 @@ pub fn dashboard() -> Html {
         <div class="dashboard-container" style="padding: 0 1rem;">
             <div class="summary-bar">
                 <div class="summary-item">
-                    <h4>{ "Total Impact" }</h4>
-                    <p>{ format!("${:.2}", total_borrowed + total_saved) }</p>
+                    <h4>{ "Welcome" }</h4>
+                    <p>{ format!("@{}", profile.username) }</p>
                 </div>
                 <div class="summary-item">
-                    <h4>{ "Total Saved" }</h4>
-                    <p>{ format!("${:.2}", total_saved) }</p>
+                    <h4>{ "Trust Score" }</h4>
+                    <p style="color: #2ecc71;">{ profile.reputation_score }</p>
+                </div>
+                <div class="summary-item">
+                    <h4>{ "Total Impact" }</h4>
+                    <p>{ format!("${:.2}", total_borrowed + total_saved) }</p>
                 </div>
                 <div class="summary-item">
                     <h4>{ "Marketplace" }</h4>
