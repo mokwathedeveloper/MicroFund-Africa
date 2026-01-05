@@ -55,6 +55,15 @@ pub fn login() -> Html {
         })
     };
 
+    let login_demo = {
+        let username = username.clone();
+        let password = password.clone();
+        Callback::from(move |_| {
+            username.set("demo_user".to_string());
+            password.set("password123".to_string());
+        })
+    };
+
     html! {
         <div class="login-page">
             <h2>{ "Login" }</h2>
@@ -78,6 +87,7 @@ pub fn login() -> Html {
                 />
                 <button type="submit">{ "Login" }</button>
             </form>
+            <button onclick={login_demo} style="background: #7f8c8d; margin-top: 1rem;">{ "Use Demo Account" }</button>
             <p>{ "Don't have an account? " }<Link<Route> to={Route::Register}>{ "Register here" }</Link<Route>></p>
         </div>
     }
