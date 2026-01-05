@@ -21,3 +21,22 @@ pub struct Loan {
     pub created_at: Option<DateTime<Utc>>,
     pub repaid_at: Option<DateTime<Utc>>,
 }
+
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+pub struct Savings {
+    pub id: Uuid,
+    pub user_id: Uuid,
+    pub amount: f64,
+    pub goal_name: Option<String>,
+    pub created_at: Option<DateTime<Utc>>,
+    pub updated_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+pub struct SavingsTransaction {
+    pub id: Uuid,
+    pub savings_id: Uuid,
+    pub amount: f64,
+    pub transaction_type: String,
+    pub created_at: Option<DateTime<Utc>>,
+}
