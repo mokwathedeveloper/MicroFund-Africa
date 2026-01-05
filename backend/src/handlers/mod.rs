@@ -25,7 +25,8 @@ pub fn config(cfg: &mut web::ServiceConfig) {
             .route("", web::post().to(savings::create_savings))
             .route("/{id}/deposit", web::post().to(savings::deposit))
     )
-    .route("/stats", web::get().to(get_platform_stats));
+    .route("/stats", web::get().to(get_platform_stats))
+    .route("/health", web::get().to(|| async { HttpResponse::Ok().body("OK") }));
 }
 
 #[derive(Serialize)]
