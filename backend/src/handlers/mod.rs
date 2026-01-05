@@ -1,4 +1,7 @@
-use actix_web::web;
+use actix_web::{web, HttpResponse};
+use serde::Serialize;
+use sqlx::PgPool;
+use crate::middleware::AppError;
 
 pub mod auth;
 pub mod loans;
@@ -26,7 +29,19 @@ pub fn config(cfg: &mut web::ServiceConfig) {
             .route("/{id}/deposit", web::post().to(savings::deposit))
     )
     .route("/stats", web::get().to(get_platform_stats))
+    .route("/ledger", web::get().to(get_live_ledger))
     .route("/health", web::get().to(|| async { HttpResponse::Ok().body("OK") }));
+}
+
+async fn get_live_ledger(pool: web::Data<PgPool>) -> Result<HttpResponse, AppError> {
+    let ledger: Vec<crate::models::PlatformTransaction> = sqlx::query_as(
+        "SELECT id, activity_type, description, amount::float8 as amount, signature, created_at FROM platform_transactions ORDER BY created_at DESC LIMIT 50"
+    )
+    .fetch_all(pool.get_ref())
+    .await
+    .map_err(|_| AppError::InternalServerError)?;
+
+    Ok(HttpResponse::Ok().json(ledger))
 }
 
 #[derive(Serialize)]
@@ -37,37 +52,31 @@ struct PlatformStats {
     active_p2p_deals: i64,
 }
 
-async fn get_platform_stats(pool: web::Data<sqlx::PgPool>) -> Result<HttpResponse, crate::middleware::AppError> {
-    let users_count = sqlx::query!("SELECT count(*) FROM users")
+async fn get_platform_stats(pool: web::Data<PgPool>) -> Result<HttpResponse, AppError> {
+    let users_count: (i64,) = sqlx::query_as("SELECT count(*) FROM users")
         .fetch_one(pool.get_ref())
         .await
-        .map_err(|_| crate::middleware::AppError::InternalServerError)?
-        .count.unwrap_or(0);
+        .map_err(|_| AppError::InternalServerError)?;
 
-    let loans_value = sqlx::query!("SELECT sum(amount) FROM loans")
+    let loans_value: (Option<f64>,) = sqlx::query_as("SELECT sum(amount)::float8 FROM loans")
         .fetch_one(pool.get_ref())
         .await
-        .map_err(|_| crate::middleware::AppError::InternalServerError)?
-        .sum.unwrap_or(sqlx::types::BigDecimal::from(0));
+        .map_err(|_| AppError::InternalServerError)?;
 
-    let savings_value = sqlx::query!("SELECT sum(amount) FROM savings")
+    let savings_value: (Option<f64>,) = sqlx::query_as("SELECT sum(amount)::float8 FROM savings")
         .fetch_one(pool.get_ref())
         .await
-        .map_err(|_| crate::middleware::AppError::InternalServerError)?
-        .sum.unwrap_or(sqlx::types::BigDecimal::from(0));
+        .map_err(|_| AppError::InternalServerError)?;
 
-    let marketplace_count = sqlx::query!("SELECT count(*) FROM loans WHERE status = 'pending'")
+    let marketplace_count: (i64,) = sqlx::query_as("SELECT count(*) FROM loans WHERE status = 'pending'")
         .fetch_one(pool.get_ref())
         .await
-        .map_err(|_| crate::middleware::AppError::InternalServerError)?
-        .count.unwrap_or(0);
+        .map_err(|_| AppError::InternalServerError)?;
 
-    use sqlx::types::ToSql; // Not needed, just for clarity on BigDecimal to f64 conversion
-    
     Ok(HttpResponse::Ok().json(PlatformStats {
-        total_users: users_count,
-        total_loans_value: format!("{:?}", loans_value).parse().unwrap_or(0.0), // Simplified for demo
-        total_savings_value: format!("{:?}", savings_value).parse().unwrap_or(0.0),
-        active_p2p_deals: marketplace_count,
+        total_users: users_count.0,
+        total_loans_value: loans_value.0.unwrap_or(0.0),
+        total_savings_value: savings_value.0.unwrap_or(0.0),
+        active_p2p_deals: marketplace_count.0,
     }))
 }

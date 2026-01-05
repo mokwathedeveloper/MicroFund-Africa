@@ -34,11 +34,12 @@ pub struct Savings {
     pub updated_at: Option<DateTime<Utc>>,
 }
 
-#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
-pub struct SavingsTransaction {
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow, Clone)]
+pub struct PlatformTransaction {
     pub id: Uuid,
-    pub savings_id: Uuid,
+    pub activity_type: String,
+    pub description: String,
     pub amount: f64,
-    pub transaction_type: String,
+    pub signature: String,
     pub created_at: Option<DateTime<Utc>>,
 }

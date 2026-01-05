@@ -38,24 +38,21 @@ pub async fn get_marketplace(
 ) -> Result<HttpResponse, AppError> {
     let user_id = get_user_id_from_req(&req)?;
 
-    let result = sqlx::query_as!(
-        MarketplaceLoan,
+    let loans: Vec<MarketplaceLoan> = sqlx::query_as(
         "SELECT l.id, l.user_id, u.username as borrower_username, l.amount::float8 as amount, l.description, l.created_at 
          FROM loans l 
          JOIN users u ON l.user_id = u.id 
-         WHERE l.status = 'pending' AND l.user_id != $1",
-        user_id
+         WHERE l.status = 'pending' AND l.user_id != $1"
     )
+    .bind(user_id)
     .fetch_all(pool.get_ref())
-    .await;
+    .await
+    .map_err(|e| {
+        tracing::error!("Failed to fetch marketplace: {:?}", e);
+        AppError::InternalServerError
+    })?;
 
-    match result {
-        Ok(loans) => Ok(HttpResponse::Ok().json(loans)),
-        Err(e) => {
-            tracing::error!("Failed to fetch marketplace: {:?}", e);
-            Err(AppError::InternalServerError)
-        }
-    }
+    Ok(HttpResponse::Ok().json(loans))
 }
 
 pub async fn fund_loan(
@@ -65,24 +62,24 @@ pub async fn fund_loan(
 ) -> Result<HttpResponse, AppError> {
     let user_id = get_user_id_from_req(&req)?;
 
-    let result = sqlx::query!(
-        "UPDATE loans SET lender_id = $1, status = 'approved' WHERE id = $2 AND status = 'pending' AND user_id != $1 RETURNING id",
-        user_id,
-        *loan_id
+    let result = sqlx::query(
+        "UPDATE loans SET lender_id = $1, status = 'approved' WHERE id = $2 AND status = 'pending' AND user_id != $1 RETURNING id"
     )
+    .bind(user_id)
+    .bind(*loan_id)
     .fetch_optional(pool.get_ref())
-    .await;
+    .await
+    .map_err(|e| {
+        tracing::error!("Failed to fund loan: {:?}", e);
+        AppError::InternalServerError
+    })?;
 
     match result {
-        Ok(Some(record)) => {
-            BlockchainService::log_loan_repayment(record.id, "FUNDING_SIG").await.ok();
+        Some(_) => {
+            BlockchainService::log_loan_repayment(*loan_id, "FUNDING_SIG").await.ok();
             Ok(HttpResponse::Ok().body("Loan funded successfully"))
         },
-        Ok(None) => Err(AppError::BadRequest("Loan not available for funding".to_string())),
-        Err(e) => {
-            tracing::error!("Failed to fund loan: {:?}", e);
-            Err(AppError::InternalServerError)
-        }
+        None => Err(AppError::BadRequest("Loan not available for funding".to_string())),
     }
 }
 
@@ -95,12 +92,13 @@ pub async fn create_loan(
     let user_id = get_user_id_from_req(&req)?;
 
     // INNOVATION: Reputation-based Dynamic Limits
-    let user = sqlx::query!("SELECT reputation_score FROM users WHERE id = $1", user_id)
+    let reputation: (Option<i32>,) = sqlx::query_as("SELECT reputation_score FROM users WHERE id = $1")
+        .bind(user_id)
         .fetch_one(pool.get_ref())
         .await
         .map_err(|_| AppError::InternalServerError)?;
 
-    let max_limit = (user.reputation_score.unwrap_or(100) as f64) * 2.0;
+    let max_limit = (reputation.0.unwrap_or(100) as f64) * 2.0;
     
     if form.amount > max_limit {
         return Err(AppError::BadRequest(format!(
@@ -111,29 +109,29 @@ pub async fn create_loan(
 
     tracing::info!("User {} creating loan of ${}", user_id, form.amount);
 
-    let _ = BlockchainService::log_loan_initialization(
-        Uuid::new_v4(), 
-        form.amount, 
-        &user_id.to_string()
-    ).await.map_err(|_| AppError::InternalServerError)?;
+    let _ = BlockchainService::log_to_ledger(
+        pool.get_ref(),
+        "LOAN_REQUEST",
+        &format!("Loan for: {}", form.description.clone().unwrap_or_default()),
+        form.amount
+    ).await;
 
-    let result = sqlx::query!(
-        "INSERT INTO loans (user_id, amount, description, status) VALUES ($1, $2, $3, $4) RETURNING id",
-        user_id,
-        form.amount as f32,
-        form.description,
-        "pending"
+    let result = sqlx::query(
+        "INSERT INTO loans (user_id, amount, description, status) VALUES ($1, $2, $3, $4) RETURNING id"
     )
+    .bind(user_id)
+    .bind(form.amount as f32)
+    .bind(&form.description)
+    .bind("pending")
     .fetch_one(pool.get_ref())
-    .await;
+    .await
+    .map_err(|e| {
+        tracing::error!("Failed to create loan: {:?}", e);
+        AppError::InternalServerError
+    })?;
 
-    match result {
-        Ok(record) => Ok(HttpResponse::Ok().json(record.id)),
-        Err(e) => {
-            tracing::error!("Failed to create loan: {:?}", e);
-            Err(AppError::InternalServerError)
-        }
-    }
+    let id: Uuid = sqlx::Row::get(&result, "id");
+    Ok(HttpResponse::Ok().json(id))
 }
 
 pub async fn repay_loan(
@@ -143,35 +141,36 @@ pub async fn repay_loan(
 ) -> Result<HttpResponse, AppError> {
     let user_id = get_user_id_from_req(&req)?;
 
-    let result = sqlx::query!(
-        "UPDATE loans SET status = 'repaid', repaid_at = NOW() WHERE id = $1 AND user_id = $2 RETURNING id",
-        form.loan_id,
-        user_id
+    let result = sqlx::query(
+        "UPDATE loans SET status = 'repaid', repaid_at = NOW() WHERE id = $1 AND user_id = $2 RETURNING id"
     )
+    .bind(form.loan_id)
+    .bind(user_id)
     .fetch_optional(pool.get_ref())
-    .await;
+    .await
+    .map_err(|e| {
+        tracing::error!("Failed to repay loan: {:?}", e);
+        AppError::InternalServerError
+    })?;
 
     match result {
-        Ok(Some(record)) => {
-            BlockchainService::log_loan_repayment(record.id, "SIMULATED_SIG")
-                .await
-                .map_err(|_| AppError::InternalServerError)?;
+        Some(_) => {
+            BlockchainService::log_to_ledger(
+                pool.get_ref(),
+                "REPAYMENT",
+                &format!("Loan {} repaid", form.loan_id),
+                0.0 // Amount could be fetched if needed
+            ).await.ok();
 
             // Increase user reputation score
-            let _ = sqlx::query!(
-                "UPDATE users SET reputation_score = reputation_score + 10 WHERE id = $1",
-                user_id
-            )
-            .execute(pool.get_ref())
-            .await;
+            let _ = sqlx::query("UPDATE users SET reputation_score = reputation_score + 10 WHERE id = $1")
+                .bind(user_id)
+                .execute(pool.get_ref())
+                .await;
                 
             Ok(HttpResponse::Ok().body("Loan repaid successfully"))
         },
-        Ok(None) => Err(AppError::NotFound),
-        Err(e) => {
-            tracing::error!("Failed to repay loan: {:?}", e);
-            Err(AppError::InternalServerError)
-        }
+        None => Err(AppError::NotFound),
     }
 }
 
@@ -181,21 +180,18 @@ pub async fn get_loans(
 ) -> Result<HttpResponse, AppError> {
     let user_id = get_user_id_from_req(&req)?;
 
-    let result = sqlx::query_as!(
-        Loan,
-        "SELECT id, user_id, lender_id, amount::float8 as amount, status, description, created_at, repaid_at FROM loans WHERE user_id = $1 OR lender_id = $1 ORDER BY created_at DESC",
-        user_id
+    let loans: Vec<Loan> = sqlx::query_as(
+        "SELECT id, user_id, lender_id, amount::float8 as amount, status, description, created_at, repaid_at FROM loans WHERE user_id = $1 OR lender_id = $1 ORDER BY created_at DESC"
     )
+    .bind(user_id)
     .fetch_all(pool.get_ref())
-    .await;
+    .await
+    .map_err(|e| {
+        tracing::error!("Failed to fetch loans: {:?}", e);
+        AppError::InternalServerError
+    })?;
 
-    match result {
-        Ok(loans) => Ok(HttpResponse::Ok().json(loans)),
-        Err(e) => {
-            tracing::error!("Failed to fetch loans: {:?}", e);
-            Err(AppError::InternalServerError)
-        }
-    }
+    Ok(HttpResponse::Ok().json(loans))
 }
 
 #[derive(Debug, Serialize, Deserialize)]
