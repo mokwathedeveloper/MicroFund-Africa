@@ -33,7 +33,8 @@ pub fn navbar() -> Html {
 
     html! {
         <nav style="background: #34495e; padding: 1rem; color: white; display: flex; justify-content: space-between; align-items: center;">
-            <div style="font-weight: bold; font-size: 1.2rem;">
+            <div style="font-weight: bold; font-size: 1.2rem; display: flex; align-items: center; gap: 10px;">
+                <div style="width: 24px; height: 24px; background: #2ecc71; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem;">{ "M" }</div>
                 <Link<Route> to={Route::Home} style="color: white; text-decoration: none;">{ "MicroFund Africa" }</Link<Route>>
             </div>
             <div style="display: flex; align-items: center; gap: 1rem;">
