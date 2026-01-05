@@ -5,9 +5,33 @@ use crate::Route;
 use crate::app_context::AppContext;
 use crate::utils::i18n::t;
 
+use crate::services::api::get;
+
+#[derive(serde::Deserialize, Default, Clone, PartialEq)]
+struct PlatformStats {
+    total_users: i64,
+    total_loans_value: f64,
+    total_savings_value: f64,
+    active_p2p_deals: i64,
+}
+
 #[function_component(Home)]
 pub fn home() -> Html {
     let context = use_context::<AppContext>().unwrap();
+    let stats = use_state(PlatformStats::default);
+
+    {
+        let stats = stats.clone();
+        use_effect_with((), move |_| {
+            wasm_bindgen_futures::spawn_local(async move {
+                if let Ok(data) = get::<PlatformStats>("/stats").await {
+                    stats.set(data);
+                }
+            });
+            || ()
+        });
+    }
+
     html! {
         <div class="home-container" style="max-width: 800px; margin: 0 auto; text-align: center;">
             <section class="hero" style="padding: 4rem 1rem;">
@@ -17,6 +41,25 @@ pub fn home() -> Html {
                 </p>
                 <div class="actions">
                     <Link<Route> to={Route::Register} classes="btn" style="padding: 1rem 2rem; font-size: 1.1rem;">{ t("get_started", &context.lang) }</Link<Route>>
+                </div>
+            </section>
+
+            <section class="platform-stats" style="display: flex; justify-content: space-around; background: #34495e; color: white; padding: 2rem; border-radius: 8px; margin-bottom: 3rem;">
+                <div>
+                    <h3>{ stats.total_users }</h3>
+                    <p>{ "Users" }</p>
+                </div>
+                <div>
+                    <h3>{ format!("${:.0}", stats.total_loans_value) }</h3>
+                    <p>{ "Loans" }</p>
+                </div>
+                <div>
+                    <h3>{ format!("${:.0}", stats.total_savings_value) }</h3>
+                    <p>{ "Saved" }</p>
+                </div>
+                <div>
+                    <h3>{ stats.active_p2p_deals }</h3>
+                    <p>{ "Deals" }</p>
                 </div>
             </section>
 
