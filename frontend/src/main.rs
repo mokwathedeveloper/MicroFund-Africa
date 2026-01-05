@@ -1,11 +1,14 @@
 use yew::prelude::*;
 use yew_router::prelude::*;
 
+mod app_context;
 mod components;
 mod pages;
 mod services;
 mod utils;
 
+use app_context::AppContextProvider;
+use components::navbar::Navbar;
 use pages::home::Home;
 use pages::login::Login;
 use pages::register::Register;
@@ -36,17 +39,17 @@ fn switch(routes: Route) -> Html {
     }
 }
 
-use components::navbar::Navbar;
-
 #[function_component(App)]
 fn app() -> Html {
     html! {
-        <BrowserRouter>
-            <Navbar />
-            <main style="padding-top: 2rem;">
-                <Switch<Route> render={switch} />
-            </main>
-        </BrowserRouter>
+        <AppContextProvider>
+            <BrowserRouter>
+                <Navbar />
+                <main style="padding-top: 2rem;">
+                    <Switch<Route> render={switch} />
+                </main>
+            </BrowserRouter>
+        </AppContextProvider>
     }
 }
 

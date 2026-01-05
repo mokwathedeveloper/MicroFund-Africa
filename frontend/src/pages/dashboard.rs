@@ -3,12 +3,29 @@ use crate::services::api::{get, post};
 use crate::services::storage::{get_cache, set_cache};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+use crate::app_context::AppContext;
+use crate::utils::i18n::t;
+use crate::components::notifications::NotificationType;
 
 #[derive(Deserialize, Serialize, Clone, PartialEq)]
 pub struct Loan {
     pub id: Uuid,
     pub amount: f64,
     pub status: String,
+    pub description: Option<String>,
+}
+
+#[derive(Deserialize, Serialize, Clone, PartialEq)]
+pub struct UserProfile {
+    pub username: String,
+    pub reputation_score: i32,
+}
+
+#[derive(Deserialize, Serialize, Clone, PartialEq)]
+pub struct MarketplaceLoan {
+    pub id: Uuid,
+    pub borrower_username: String,
+    pub amount: f64,
     pub description: Option<String>,
 }
 
@@ -33,6 +50,7 @@ struct RepayRequest { loan_id: Uuid }
 
 #[function_component(Dashboard)]
 pub fn dashboard() -> Html {
+    let context = use_context::<AppContext>().unwrap();
     let loans = use_state(|| get_cache::<Vec<Loan>>("cache_loans").unwrap_or_default());
     let marketplace = use_state(|| Vec::<MarketplaceLoan>::new());
     let savings = use_state(|| get_cache::<Vec<Savings>>("cache_savings").unwrap_or_default());
@@ -85,14 +103,21 @@ pub fn dashboard() -> Html {
         let amount = loan_amount.clone();
         let desc = loan_desc.clone();
         let fetch_data = fetch_data.clone();
+        let context = context.clone();
         Callback::from(move |e: SubmitEvent| {
             e.prevent_default();
             let amount_val = *amount;
             let desc_val = (*desc).clone();
             let fetch_data = fetch_data.clone();
+            let context = context.clone();
             wasm_bindgen_futures::spawn_local(async move {
-                let _: Result<Uuid, String> = post("/loans", &CreateLoanRequest { amount: amount_val, description: desc_val }).await;
-                fetch_data.emit(());
+                match post::<_, Uuid>("/loans", &CreateLoanRequest { amount: amount_val, description: desc_val }).await {
+                    Ok(_) => {
+                        context.add_notification.emit(("Loan requested successfully!".to_string(), NotificationType::Success));
+                        fetch_data.emit(());
+                    }
+                    Err(e) => context.add_notification.emit((format!("Error: {}", e), NotificationType::Error)),
+                }
             });
         })
     };
@@ -100,13 +125,20 @@ pub fn dashboard() -> Html {
     let on_savings_submit = {
         let goal = savings_goal.clone();
         let fetch_data = fetch_data.clone();
+        let context = context.clone();
         Callback::from(move |e: SubmitEvent| {
             e.prevent_default();
             let goal_val = (*goal).clone();
             let fetch_data = fetch_data.clone();
+            let context = context.clone();
             wasm_bindgen_futures::spawn_local(async move {
-                let _: Result<Uuid, String> = post("/savings", &CreateSavingsRequest { goal_name: goal_val }).await;
-                fetch_data.emit(());
+                match post::<_, Uuid>("/savings", &CreateSavingsRequest { goal_name: goal_val }).await {
+                    Ok(_) => {
+                        context.add_notification.emit(("Savings goal created!".to_string(), NotificationType::Success));
+                        fetch_data.emit(());
+                    }
+                    Err(e) => context.add_notification.emit((format!("Error: {}", e), NotificationType::Error)),
+                }
             });
         })
     };
@@ -114,37 +146,58 @@ pub fn dashboard() -> Html {
     let deposit = |id: Uuid| {
         let fetch_data = fetch_data.clone();
         let phone = phone_number.clone();
+        let context = context.clone();
         Callback::from(move |_| {
             let fetch_data = fetch_data.clone();
             let phone_val = (*phone).clone();
+            let context = context.clone();
             wasm_bindgen_futures::spawn_local(async move {
-                let _: Result<String, String> = post(&format!("/savings/{}/deposit", id), &DepositRequest { 
+                match post::<_, String>(&format!("/savings/{}/deposit", id), &DepositRequest { 
                     amount: 10.0, 
                     phone_number: if phone_val.is_empty() { None } else { Some(phone_val) }
-                }).await;
-                fetch_data.emit(());
+                }).await {
+                    Ok(_) => {
+                        context.add_notification.emit(("Deposit initiated! Check your phone for STK push.", NotificationType::Info));
+                        fetch_data.emit(());
+                    }
+                    Err(e) => context.add_notification.emit((format!("Error: {}", e), NotificationType::Error)),
+                }
             });
         })
     };
 
     let repay = |id: Uuid| {
         let fetch_data = fetch_data.clone();
+        let context = context.clone();
         Callback::from(move |_| {
             let fetch_data = fetch_data.clone();
+            let context = context.clone();
             wasm_bindgen_futures::spawn_local(async move {
-                let _: Result<String, String> = post("/loans/repay", &RepayRequest { loan_id: id }).await;
-                fetch_data.emit(());
+                match post::<_, String>("/loans/repay", &RepayRequest { loan_id: id }).await {
+                    Ok(_) => {
+                        context.add_notification.emit(("Loan repaid successfully! Your Trust Score increased.", NotificationType::Success));
+                        fetch_data.emit(());
+                    }
+                    Err(e) => context.add_notification.emit((format!("Error: {}", e), NotificationType::Error)),
+                }
             });
         })
     };
 
     let fund_loan = |id: Uuid| {
         let fetch_data = fetch_data.clone();
+        let context = context.clone();
         Callback::from(move |_| {
             let fetch_data = fetch_data.clone();
+            let context = context.clone();
             wasm_bindgen_futures::spawn_local(async move {
-                let _: Result<String, String> = post(&format!("/loans/{}/fund", id), &()).await;
-                fetch_data.emit(());
+                match post::<_, String>(&format!("/loans/{}/fund", id), &()).await {
+                    Ok(_) => {
+                        context.add_notification.emit(("You funded a neighbor's loan! Impact increased.", NotificationType::Success));
+                        fetch_data.emit(());
+                    }
+                    Err(e) => context.add_notification.emit((format!("Error: {}", e), NotificationType::Error)),
+                }
             });
         })
     };
@@ -160,22 +213,22 @@ pub fn dashboard() -> Html {
                     <p>{ format!("@{}", profile.username) }</p>
                 </div>
                 <div class="summary-item">
-                    <h4>{ "Trust Score" }</h4>
+                    <h4>{ t("trust_score", &context.lang) }</h4>
                     <p style="color: #2ecc71;">{ profile.reputation_score }</p>
                 </div>
                 <div class="summary-item">
-                    <h4>{ "Total Impact" }</h4>
+                    <h4>{ t("total_impact", &context.lang) }</h4>
                     <p>{ format!("${:.2}", total_borrowed + total_saved) }</p>
                 </div>
                 <div class="summary-item">
-                    <h4>{ "Marketplace" }</h4>
+                    <h4>{ t("marketplace", &context.lang) }</h4>
                     <p>{ marketplace.len() }</p>
                 </div>
             </div>
 
             <div class="dashboard-grid" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));">
                 <section class="section-card">
-                    <h3>{ "P2P Marketplace" }</h3>
+                    <h3>{ t("marketplace", &context.lang) }</h3>
                     <p style="font-size: 0.9rem; color: #7f8c8d;">{ "Fund a loan to help a neighbor and earn reputation." }</p>
                     <div class="marketplace-list">
                         { for marketplace.iter().map(|m| html! {
@@ -185,18 +238,18 @@ pub fn dashboard() -> Html {
                                     <p style="margin: 0.2rem 0; font-size: 0.8rem;">{ format!("By: @{}", m.borrower_username) }</p>
                                     <p style="margin: 0; font-size: 0.8rem; color: #7f8c8d;">{ m.description.clone().unwrap_or_default() }</p>
                                 </div>
-                                <button onclick={fund_loan(m.id)} class="btn" style="width: auto; font-size: 0.8rem; background: #3498db;">{ "Fund" }</button>
+                                <button onclick={fund_loan(m.id)} class="btn" style="width: auto; font-size: 0.8rem; background: #3498db;">{ t("fund", &context.lang) }</button>
                             </div>
                         })}
                     </div>
                 </section>
 
                 <section class="section-card">
-                    <h3>{ "Microloans" }</h3>
+                    <h3>{ t("microloans", &context.lang) }</h3>
                     <form onsubmit={on_loan_submit} style="margin-bottom: 1.5rem;">
                         <input type="number" placeholder="Amount ($)" oninput={let a = loan_amount.clone(); Callback::from(move |e: InputEvent| a.set(e.target_unchecked_into::<web_sys::HtmlInputElement>().value().parse().unwrap_or(0.0)))} />
                         <input type="text" placeholder="Purpose (e.g. Seeds, Repair)" oninput={let d = loan_desc.clone(); Callback::from(move |e: InputEvent| d.set(e.target_unchecked_into::<web_sys::HtmlInputElement>().value()))} />
-                        <button type="submit">{ "Request Loan" }</button>
+                        <button type="submit">{ t("request_loan", &context.lang) }</button>
                     </form>
                     
                     <div class="loan-list">
@@ -215,7 +268,7 @@ pub fn dashboard() -> Html {
                                         <span class={classes!("status-badge", status_class)}>{ &loan.status }</span>
                                     </div>
                                     { if loan.status != "repaid" {
-                                        html! { <button onclick={repay(loan.id)} class="btn-secondary" style="width: auto; font-size: 0.8rem;">{ "Repay" }</button> }
+                                        html! { <button onclick={repay(loan.id)} class="btn-secondary" style="width: auto; font-size: 0.8rem;">{ t("repay", &context.lang) }</button> }
                                     } else { html! {} }}
                                 </div>
                             }
@@ -224,14 +277,14 @@ pub fn dashboard() -> Html {
                 </section>
 
                 <section class="section-card">
-                    <h3>{ "Savings Goals" }</h3>
+                    <h3>{ t("savings_goals", &context.lang) }</h3>
                     <div style="margin-bottom: 1rem;">
                         <input type="text" placeholder="M-Pesa Phone (e.g. 254712...)" 
                             oninput={let p = phone_number.clone(); Callback::from(move |e: InputEvent| p.set(e.target_unchecked_into::<web_sys::HtmlInputElement>().value()))} />
                     </div>
                     <form onsubmit={on_savings_submit} style="margin-bottom: 1.5rem;">
                         <input type="text" placeholder="Goal Name (e.g. School Fees)" oninput={let g = savings_goal.clone(); Callback::from(move |e: InputEvent| g.set(e.target_unchecked_into::<web_sys::HtmlInputElement>().value()))} />
-                        <button type="submit" class="btn-secondary">{ "Create Goal" }</button>
+                        <button type="submit" class="btn-secondary">{ t("create_goal", &context.lang) }</button>
                     </form>
 
                     <div class="savings-list">

@@ -2,17 +2,21 @@ use yew::prelude::*;
 use yew_router::prelude::*;
 use crate::Route;
 
+use crate::app_context::AppContext;
+use crate::utils::i18n::t;
+
 #[function_component(Home)]
 pub fn home() -> Html {
+    let context = use_context::<AppContext>().unwrap();
     html! {
         <div class="home-container" style="max-width: 800px; margin: 0 auto; text-align: center;">
             <section class="hero" style="padding: 4rem 1rem;">
-                <h1 style="font-size: 3rem; margin-bottom: 1rem;">{ "Financial Freedom for Everyone" }</h1>
+                <h1 style="font-size: 3rem; margin-bottom: 1rem;">{ t("welcome", &context.lang) }</h1>
                 <p style="font-size: 1.2rem; color: #7f8c8d; margin-bottom: 2rem;">
-                    { "MicroFund Africa provides secure, blockchain-powered microloans and savings for the unbanked across the continent." }
+                    { t("hero_sub", &context.lang) }
                 </p>
                 <div class="actions">
-                    <Link<Route> to={Route::Register} classes="btn" style="padding: 1rem 2rem; font-size: 1.1rem;">{ "Start Borrowing" }</Link<Route>>
+                    <Link<Route> to={Route::Register} classes="btn" style="padding: 1rem 2rem; font-size: 1.1rem;">{ t("get_started", &context.lang) }</Link<Route>>
                 </div>
             </section>
 
