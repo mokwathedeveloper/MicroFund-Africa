@@ -98,17 +98,29 @@ pub fn dashboard() -> Html {
 
             <h3>{ "Your Loans" }</h3>
             <div class="loan-list">
-                { for loans.iter().map(|loan| html! {
-                    <div class="stat-card" style="text-align: left;">
-                        <p><strong>{ "Amount: " }</strong>{ format!("${:.2}", loan.amount) }</p>
-                        <p><strong>{ "Status: " }</strong>{ &loan.status }</p>
-                        <p><strong>{ "Purpose: " }</strong>{ loan.description.clone().unwrap_or_default() }</p>
-                        { if loan.status == "pending" || loan.status == "approved" {
-                            html! { <button onclick={repay(loan.id)} class="btn-secondary">{ "Repay" }</button> }
-                        } else {
-                            html! {}
-                        }}
-                    </div>
+                { for loans.iter().map(|loan| {
+                    let status_class = match loan.status.as_str() {
+                        "pending" => "status-pending",
+                        "approved" => "status-approved",
+                        "repaid" => "status-repaid",
+                        _ => "",
+                    };
+                    html! {
+                        <div class="stat-card" style="text-align: left; display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <p style="margin: 0; font-size: 1.2rem; font-weight: bold;">{ format!("${:.2}", loan.amount) }</p>
+                                <p style="margin: 0.5rem 0; color: #7f8c8d;">{ loan.description.clone().unwrap_or_default() }</p>
+                                <span class={classes!("status-badge", status_class)}>{ &loan.status }</span>
+                            </div>
+                            <div>
+                                { if loan.status == "pending" || loan.status == "approved" {
+                                    html! { <button onclick={repay(loan.id)} class="btn-secondary" style="width: auto; padding: 0.5rem 1rem;">{ "Repay" }</button> }
+                                } else {
+                                    html! {}
+                                }}
+                            </div>
+                        </div>
+                    }
                 })}
             </div>
         </div>
