@@ -110,6 +110,12 @@ pub fn dashboard() -> Html {
             let desc_val = (*desc).clone();
             let fetch_data = fetch_data.clone();
             let context = context.clone();
+
+            if amount_val <= 0.0 {
+                context.add_notification.emit(("Amount must be greater than zero".to_string(), NotificationType::Error));
+                return;
+            }
+
             wasm_bindgen_futures::spawn_local(async move {
                 match post::<_, Uuid>("/loans", &CreateLoanRequest { amount: amount_val, description: desc_val }).await {
                     Ok(_) => {
@@ -131,6 +137,12 @@ pub fn dashboard() -> Html {
             let goal_val = (*goal).clone();
             let fetch_data = fetch_data.clone();
             let context = context.clone();
+
+            if goal_val.is_empty() {
+                context.add_notification.emit(("Please enter a goal name".to_string(), NotificationType::Error));
+                return;
+            }
+
             wasm_bindgen_futures::spawn_local(async move {
                 match post::<_, Uuid>("/savings", &CreateSavingsRequest { goal_name: goal_val }).await {
                     Ok(_) => {

@@ -43,6 +43,15 @@ pub fn register() -> Html {
             let navigator = navigator.clone();
 
             wasm_bindgen_futures::spawn_local(async move {
+                if password_val.len() < 6 {
+                    error.set(Some("Password must be at least 6 characters long".to_string()));
+                    return;
+                }
+                if !email_val.contains('@') {
+                    error.set(Some("Please enter a valid email address".to_string()));
+                    return;
+                }
+
                 let res: Result<AuthResponse, String> = post("/auth/register", &RegisterRequest {
                     username: username_val,
                     email: email_val,
