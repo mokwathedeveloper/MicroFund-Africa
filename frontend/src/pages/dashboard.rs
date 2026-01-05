@@ -26,24 +26,10 @@ struct CreateLoanRequest { amount: f64, description: String }
 struct CreateSavingsRequest { goal_name: String }
 
 #[derive(Serialize)]
-struct DepositRequest { amount: f64 }
+struct DepositRequest { amount: f64, phone_number: Option<String> }
 
 #[derive(Serialize)]
 struct RepayRequest { loan_id: Uuid }
-
-#[derive(Deserialize, Serialize, Clone, PartialEq)]
-pub struct MarketplaceLoan {
-    pub id: Uuid,
-    pub borrower_username: String,
-    pub amount: f64,
-    pub description: Option<String>,
-}
-
-#[derive(Deserialize, Serialize, Clone, PartialEq)]
-pub struct UserProfile {
-    pub username: String,
-    pub reputation_score: i32,
-}
 
 #[function_component(Dashboard)]
 pub fn dashboard() -> Html {
@@ -55,6 +41,7 @@ pub fn dashboard() -> Html {
     let loan_amount = use_state(|| 0.0);
     let loan_desc = use_state(|| "".to_string());
     let savings_goal = use_state(|| "".to_string());
+    let phone_number = use_state(|| "".to_string());
 
     let fetch_data = {
         let loans = loans.clone();
@@ -126,10 +113,15 @@ pub fn dashboard() -> Html {
 
     let deposit = |id: Uuid| {
         let fetch_data = fetch_data.clone();
+        let phone = phone_number.clone();
         Callback::from(move |_| {
             let fetch_data = fetch_data.clone();
+            let phone_val = (*phone).clone();
             wasm_bindgen_futures::spawn_local(async move {
-                let _: Result<String, String> = post(&format!("/savings/{}/deposit", id), &DepositRequest { amount: 10.0 }).await;
+                let _: Result<String, String> = post(&format!("/savings/{}/deposit", id), &DepositRequest { 
+                    amount: 10.0, 
+                    phone_number: if phone_val.is_empty() { None } else { Some(phone_val) }
+                }).await;
                 fetch_data.emit(());
             });
         })
@@ -233,6 +225,10 @@ pub fn dashboard() -> Html {
 
                 <section class="section-card">
                     <h3>{ "Savings Goals" }</h3>
+                    <div style="margin-bottom: 1rem;">
+                        <input type="text" placeholder="M-Pesa Phone (e.g. 254712...)" 
+                            oninput={let p = phone_number.clone(); Callback::from(move |e: InputEvent| p.set(e.target_unchecked_into::<web_sys::HtmlInputElement>().value()))} />
+                    </div>
                     <form onsubmit={on_savings_submit} style="margin-bottom: 1.5rem;">
                         <input type="text" placeholder="Goal Name (e.g. School Fees)" oninput={let g = savings_goal.clone(); Callback::from(move |e: InputEvent| g.set(e.target_unchecked_into::<web_sys::HtmlInputElement>().value()))} />
                         <button type="submit" class="btn-secondary">{ "Create Goal" }</button>
