@@ -55,6 +55,7 @@ graph TD
 
 ## Implementation Status
 - [x] User registration & Login (Argon2 + JWT)
+- [x] **Reputation System**: "Trust Score" that increases with every successful repayment.
 - [x] Microloan submission (Backend + Frontend)
 - [x] **P2P Marketplace**: Peer-to-peer lending where users fund each other's loans.
 - [x] **Savings Platform**: Create goals and deposit funds.
