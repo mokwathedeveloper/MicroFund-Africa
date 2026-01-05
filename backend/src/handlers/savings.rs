@@ -6,6 +6,8 @@ use crate::middleware::AppError;
 use crate::handlers::loans::get_user_id_from_req;
 use crate::models::Savings;
 
+use crate::services::mpesa::MpesaService;
+
 #[derive(Deserialize)]
 pub struct CreateSavingsRequest {
     pub goal_name: String,
@@ -14,6 +16,7 @@ pub struct CreateSavingsRequest {
 #[derive(Deserialize)]
 pub struct DepositRequest {
     pub amount: f64,
+    pub phone_number: Option<String>,
 }
 
 pub async fn get_savings(
@@ -70,6 +73,13 @@ pub async fn deposit(
     form: web::Json<DepositRequest>,
 ) -> Result<HttpResponse, AppError> {
     let _user_id = get_user_id_from_req(&req)?;
+
+    // Simulate M-Pesa Payment if phone number is provided
+    if let Some(phone) = &form.phone_number {
+        MpesaService::initiate_stk_push(phone, form.amount)
+            .await
+            .map_err(|_| AppError::InternalServerError)?;
+    }
 
     let mut tx = pool.begin().await.map_err(|_| AppError::InternalServerError)?;
 
