@@ -205,6 +205,13 @@ pub fn dashboard() -> Html {
     let total_borrowed: f64 = loans.iter().map(|l| l.amount).sum();
     let total_saved: f64 = savings.iter().map(|s| s.amount).sum();
 
+    // Simple SVG Visualization for Savings vs Borrowing
+    let chart_width = 200;
+    let chart_height = 20;
+    let max_val = if total_borrowed > total_saved { total_borrowed } else { total_saved };
+    let borrow_width = if max_val > 0.0 { (total_borrowed / max_val) * chart_width as f64 } else { 0.0 };
+    let savings_width = if max_val > 0.0 { (total_saved / max_val) * chart_width as f64 } else { 0.0 };
+
     html! {
         <div class="dashboard-container" style="padding: 0 1rem;">
             <div class="summary-bar">
@@ -221,8 +228,15 @@ pub fn dashboard() -> Html {
                     <p>{ format!("${:.2}", total_borrowed + total_saved) }</p>
                 </div>
                 <div class="summary-item">
-                    <h4>{ t("marketplace", &context.lang) }</h4>
-                    <p>{ marketplace.len() }</p>
+                    <h4>{ "Balance View" }</h4>
+                    <svg width={chart_width.to_string()} height={(chart_height * 2 + 5).to_string()} style="margin-top: 5px;">
+                        <rect x="0" y="0" width={savings_width.to_string()} height={chart_height.to_string()} fill="#2ecc71" rx="2" />
+                        <rect x="0" y={(chart_height + 5).to_string()} width={borrow_width.to_string()} height={chart_height.to_string()} fill="#e74c3c" rx="2" />
+                    </svg>
+                    <div style="display: flex; gap: 10px; font-size: 0.7rem; margin-top: 2px;">
+                        <span><i style="background: #2ecc71; width: 8px; height: 8px; display: inline-block;"></i>{ " Saved" }</span>
+                        <span><i style="background: #e74c3c; width: 8px; height: 8px; display: inline-block;"></i>{ " Debt" }</span>
+                    </div>
                 </div>
             </div>
 
