@@ -13,3 +13,11 @@ pub fn get_token() -> Option<String> {
 pub fn remove_token() {
     LocalStorage::delete(TOKEN_KEY);
 }
+
+pub fn set_cache<T: serde::Serialize>(key: &str, data: &T) {
+    let _ = LocalStorage::set(key, data);
+}
+
+pub fn get_cache<T: for<'de> serde::Deserialize<'de>>(key: &str) -> Option<T> {
+    LocalStorage::get(key).ok()
+}
