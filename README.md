@@ -79,12 +79,42 @@ graph TD
 
 ## Technical Highlights
 
+
+
 - **Memory Safety**: Leverages Rust's ownership model across the entire stack.
+
+
 
 - **Async Power**: High-concurrency handling using `tokio` and `actix-web`.
 
+
+
 - **WASM Performance**: The Yew frontend compiles to highly efficient WebAssembly.
+
+
 
 - **Custom Error Handling**: Robust error propagation using `thiserror` and `AppError` middleware.
 
+
+
 - **Blockchain Simulation**: Automated logging of loan lifecycle events to a simulated ledger.
+
+
+
+- **Payment Integration**: Simulated M-Pesa STK Push for seamless deposits and repayments.
+
+
+
+
+
+
+
+## AI Transparency
+
+
+
+This project was developed with the assistance of a Large Language Model (LLM) to ensure rapid prototyping, memory-safe Rust implementation, and comprehensive documentation for the Rust Africa Hackathon 2026.
+
+
+
+
