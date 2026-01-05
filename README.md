@@ -56,6 +56,7 @@ graph TD
 ## Implementation Status
 - [x] User registration & Login (Argon2 + JWT)
 - [x] Microloan submission (Backend + Frontend)
+- [x] **P2P Marketplace**: Peer-to-peer lending where users fund each other's loans.
 - [x] **Savings Platform**: Create goals and deposit funds.
 - [x] **Offline-First**: LocalStorage caching for loans and savings.
 - [x] **Dashboard Analytics**: Real-time summary of borrowing and savings.
